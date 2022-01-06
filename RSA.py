@@ -24,19 +24,19 @@ class RsaKey:
 
       if (not self.__is_power_of_two(bytes_len)): raise Exception("Bytes lenght must be of the form 2^n")
       self.bytes_len = bytes_len
-      self.p = number.getPrime(self.bytes_len)
-      self.q = number.getPrime(self.bytes_len)
+      self.__p = number.getPrime(self.bytes_len)
+      self.__q = number.getPrime(self.bytes_len)
 
-      self.n = self.p * self.q
+      self.n = self.__p * self.__q
 
-      lambda_n = (self.p - 1) * (self.q - 1)
+      lambda_n = (self.__p - 1) * (self.__q - 1)
 
       self.e = 65537
 
-      self.d = pow(self.e, -1, lambda_n)
+      self.__d = pow(self.e, -1, lambda_n)
 
       self.public_key = (self.n, self.e)
-      self.private_key = (self.n, self.d)
+      self.private_key = (self.n, self.__d)
 
       self.__randfunc = Random.get_random_bytes
 
@@ -62,24 +62,21 @@ class RsaKey:
       return p
 
 
-    def encrypt(self, m, public_key):
-      n = public_key[0]
-      e = public_key[1]
-      return pow(m, e, n)
+    def encrypt(self, m):
+      return pow(m, self.e, self.n)
 
-    def decrypt(self, c, private_key):
-      n = private_key[0]
-      d = private_key[1]
-      return pow(c, d, n)
+
+    def decrypt(self, c):
+      return pow(c, self.__d, self.n)
 
 
     def bytes2int(self, raw_bytes: bytes) -> int:
-      # Inspired from rsa library
+      # Inspired from python-rsa library
       return int.from_bytes(raw_bytes, "big", signed=False)
 
 
     def int2bytes(self, number: int, fill_size: int = 0) -> bytes:
-      # Inspired from rsa library
+      # Inspired from pytohn-rsa library
       if number < 0:
         raise ValueError("Number must be an unsigned integer: %d" % number)
 
@@ -105,14 +102,14 @@ class RsaKey:
 
       raw_bytes_list = [bytes(text, 'utf-8') for text in trunc_text]
       payload_list = [self.bytes2int(raw_bytes) for raw_bytes in raw_bytes_list]
-      encrypted_number_list = [self.encrypt(payload, self.public_key) for payload in payload_list]
+      encrypted_number_list = [self.encrypt(payload) for payload in payload_list]
       bytes_block_list = [self.int2bytes(encrypted_number) for encrypted_number in encrypted_number_list]
       return bytes_block_list
 
 
     def from_encrypted_to_output(self, encrypted_bytes_list):
       encrypted_number_list = [self.bytes2int(encrypted_bytes) for encrypted_bytes in encrypted_bytes_list]
-      decrypted_list = [self.decrypt(encrypted_number, self.private_key) for encrypted_number in encrypted_number_list]
+      decrypted_list = [self.decrypt(encrypted_number) for encrypted_number in encrypted_number_list]
       output = [self.int2bytes(decrypted).decode("utf-8") for decrypted in decrypted_list]
       return "".join(output)
 
@@ -122,12 +119,12 @@ class RsaKey:
       binary_key = DerSequence([0,
           self.n,
           self.e,
-          self.d,
-          self.p,
-          self.q,
-          self.d % (self.p-1),
-          self.d % (self.q-1),
-          Integer(self.q).inverse(self.p)
+          self.__d,
+          self.__p,
+          self.__q,
+          self.__d % (self.__p-1),
+          self.__d % (self.__q-1),
+          Integer(self.__q).inverse(self.__p)
         ]).encode()
 
       pem_str_private = PEM.encode(binary_key, "RSA PRIVATE KEY", None, self.__randfunc)
@@ -160,9 +157,9 @@ class RsaKey:
 
 
 if __name__ == "__main__":
-  rsa = RsaKey(1024)
+  rsa = RsaKey()
   
-  print(f"\nRSA KEYS : \n{rsa}\n")
+  print(f"\nRSA KEYS \n\n{rsa}\n")
 
   print("#########################################\n")
 
@@ -180,6 +177,8 @@ if __name__ == "__main__":
 
   pem_str_public = rsa.export_public_key()
   print(f"{pem_str_public}\n")
+
+  print("#########################################\n")
 
   imported_private_key = rsa.import_private_key(pem_str_private)
   print(f"Imported private key: {imported_private_key}\n")
